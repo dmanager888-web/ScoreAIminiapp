@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { loadGiftPick, type AiPick } from "./ai";
 import { buildLead, pickOfferUrl, submitLead } from "./api";
 import {
   BONUS_LABEL,
@@ -8,9 +9,8 @@ import {
   parseReferrer,
   PRIZES,
   PROMO_CODE,
-  STARTER_PREDICTION,
 } from "./prizes";
-import { haptic, openExternal, telegramUser } from "./telegram";
+import { haptic, openBot, openExternal, telegramUser } from "./telegram";
 import Wheel from "./Wheel";
 
 type Step = "gift" | "wheel" | "win" | "pending" | "invite";
@@ -58,8 +58,23 @@ export default function App() {
   const [sending, setSending] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
+  const [giftPick, setGiftPick] = useState<AiPick | null>(null);
+  const [giftLoading, setGiftLoading] = useState(true);
 
   const shareUrl = user.telegramId ? inviteLink(user.telegramId) : "";
+
+  useEffect(() => {
+    let cancelled = false;
+    loadGiftPick().then((pick) => {
+      if (!cancelled) {
+        setGiftPick(pick);
+        setGiftLoading(false);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function claimGift() {
     localStorage.setItem(storageKey("gift", user.telegramId), "1");
@@ -151,12 +166,27 @@ export default function App() {
           <p className="kicker">Presente imediato</p>
           <h2>1 palpite de IA liberado</h2>
           <div className="prediction">
-            <p className="kicker">{STARTER_PREDICTION.league}</p>
-            <p className="match">{STARTER_PREDICTION.match}</p>
-            <p className="pick">{STARTER_PREDICTION.pick}</p>
-            <p className="copy">Confiança da IA: {STARTER_PREDICTION.confidence}</p>
+            {giftLoading || !giftPick ? (
+              <p className="copy">Carregando palpite...</p>
+            ) : (
+              <>
+                <p className="kicker">{giftPick.league}</p>
+                <p className="match">{giftPick.match}</p>
+                <p className="pick">{giftPick.pick}</p>
+                <p className="copy">
+                  Confiança da IA: {giftPick.confidence}
+                  {giftPick.source === "demo" ? " · demo até a API voltar" : ""}
+                </p>
+              </>
+            )}
           </div>
-          <p className="copy">Agora gire a roleta. Só vale 1 vez — o prêmio é 500% no depósito.</p>
+          <p className="copy">
+            Os próximos palpites detalhados saem no bot @{BOT_USERNAME}. Agora gire a roleta — 1
+            vez.
+          </p>
+          <button className="cta secondary" type="button" onClick={() => openBot()}>
+            Pedir palpite no bot
+          </button>
           <button className="cta" type="button" onClick={claimGift}>
             Girar a roleta
           </button>
@@ -211,9 +241,12 @@ export default function App() {
           </p>
           <p className="copy">
             Use o promocode no cadastro. Os 20 palpites detalhados de IA entram só depois que o
-            registro for confirmado — não no clique do botão.
+            registro for confirmado — não no clique do botão. Depois peça os palpites no bot.
           </p>
-          <button className="cta" type="button" disabled={sending} onClick={register}>
+          <button className="cta" type="button" onClick={() => openBot()}>
+            Abrir o bot e pedir os 20 palpites
+          </button>
+          <button className="cta secondary" type="button" disabled={sending} onClick={register}>
             {sending ? "Abrindo..." : "Abrir cadastro de novo"}
           </button>
           <button className="cta secondary" type="button" onClick={showInvite}>
@@ -252,3 +285,4 @@ export default function App() {
     </main>
   );
 }
+
