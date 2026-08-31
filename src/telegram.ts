@@ -53,7 +53,7 @@ export function openExternal(url: string) {
 export function openBot(start?: string) {
   const path = start ? `?start=${encodeURIComponent(start)}` : "";
   const url = `https://t.me/PlacarAI_bot${path}`;
-  const tg = getTelegram();
+  const tg = getTelegram() as { openTelegramLink?: (href: string) => void } | null;
   if (tg?.openTelegramLink) {
     tg.openTelegramLink(url);
     return;
