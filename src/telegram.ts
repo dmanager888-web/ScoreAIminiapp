@@ -49,3 +49,14 @@ export function openExternal(url: string) {
   }
   window.open(url, "_blank", "noopener,noreferrer");
 }
+
+export function openBot(start?: string) {
+  const path = start ? `?start=${encodeURIComponent(start)}` : "";
+  const url = `https://t.me/PlacarAI_bot${path}`;
+  const tg = getTelegram();
+  if (tg?.openTelegramLink) {
+    tg.openTelegramLink(url);
+    return;
+  }
+  window.open(url, "_blank", "noopener,noreferrer");
+}
