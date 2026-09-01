@@ -36,9 +36,16 @@ export async function requestPick(text: string, image?: ImagePayload) {
     answer?: string;
     credits?: number;
     error?: string;
+    registered?: boolean;
   };
   if (response.status === 402 || data.error === "no_credits") {
-    return { ok: false as const, error: "no_credits", credits: 0, answer: "" };
+    return {
+      ok: false as const,
+      error: "no_credits",
+      credits: 0,
+      answer: "",
+      registered: Boolean(data.registered),
+    };
   }
   if (response.status === 401 || data.error === "auth") {
     throw new Error("Abra o Mini App pelo Telegram para pedir palpite.");
