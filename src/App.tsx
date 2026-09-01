@@ -131,12 +131,6 @@ export default function App() {
     }
   }
 
-  function showInvite() {
-    localStorage.setItem(storageKey("credits_done", user.telegramId), "1");
-    haptic("tap");
-    setStep("invite");
-  }
-
   async function copyInvite() {
     if (!shareUrl) return;
     try {
@@ -231,36 +225,29 @@ export default function App() {
             Promocode <strong>{PROMO_CODE}</strong>
           </p>
           <p className="copy">
-            Cadastre-se pelo nosso link e use o promocode no depósito. Os{" "}
-            <strong>20 palpites de IA</strong> são liberados somente após o registro com este
-            promocode.
+            Para usar o bônus de 500%, cadastre-se e aplique o promocode. Depois que o registro for
+            confirmado, você recebe <strong>20 palpites de IA</strong> no bot.
           </p>
           {error ? <p className="error">{error}</p> : null}
           <button className="cta" type="button" disabled={sending} onClick={register}>
-            {sending ? "Abrindo..." : "Cadastrar e ganhar 20 palpites de IA"}
+            {sending ? "Abrindo..." : "Cadastrar e usar o bônus"}
           </button>
         </section>
       )}
 
       {step === "pending" && (
         <section className="card">
-          <p className="kicker">Cadastro</p>
-          <h2>20 palpites após o registro</h2>
+          <p className="kicker">Você ganhou</p>
+          <h2>Bônus {BONUS_LABEL}</h2>
           <p className="promo">
             Promocode <strong>{PROMO_CODE}</strong>
           </p>
           <p className="copy">
-            Use o promocode no cadastro. Os 20 palpites detalhados de IA entram só depois que o
-            registro for confirmado — não no clique do botão. Depois peça os palpites no bot.
+            Cadastre-se para usar o bônus. Os 20 palpites de IA entram após o registro confirmado.
           </p>
-          <button className="cta" type="button" onClick={() => openBot()}>
-            Abrir o bot e pedir os 20 palpites
-          </button>
-          <button className="cta secondary" type="button" disabled={sending} onClick={register}>
-            {sending ? "Abrindo..." : "Abrir cadastro de novo"}
-          </button>
-          <button className="cta secondary" type="button" onClick={showInvite}>
-            Já usei os 20 palpites
+          {error ? <p className="error">{error}</p> : null}
+          <button className="cta" type="button" disabled={sending} onClick={register}>
+            {sending ? "Abrindo..." : "Cadastrar e usar o bônus"}
           </button>
         </section>
       )}
@@ -295,5 +282,4 @@ export default function App() {
     </main>
   );
 }
-
 
