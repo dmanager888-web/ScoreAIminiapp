@@ -1,52 +1,51 @@
-import { STARTER_PREDICTION } from "./prizes";
 import { telegramUser } from "./telegram";
+import type { ImagePayload } from "./image";
 
-export type AiPick = {
-  league: string;
-  match: string;
-  pick: string;
-  confidence: string;
-  source: "api" | "demo";
-};
-
-type RawPick = {
-  league?: string;
-  match?: string;
-  pick?: string;
-  tip?: string;
-  confidence?: string;
-  remaining?: number;
-};
-
-export async function loadGiftPick(): Promise<AiPick> {
+export async function loadSaldo() {
   const user = telegramUser();
-  try {
-    const response = await fetch("/api/ai/predict", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        telegram_id: user.telegramId,
-        initData: user.initData,
-        language: "pt-BR",
-        kind: "gift",
-      }),
-    });
-    if (!response.ok) {
-      return { ...STARTER_PREDICTION, source: "demo" };
-    }
-    const data = (await response.json()) as RawPick;
-    const pick = data.pick || data.tip;
-    if (!data.match || !pick) {
-      return { ...STARTER_PREDICTION, source: "demo" };
-    }
-    return {
-      league: data.league || "Placar.AI",
-      match: data.match,
-      pick,
-      confidence: data.confidence || "—",
-      source: "api",
-    };
-  } catch {
-    return { ...STARTER_PREDICTION, source: "demo" };
+  const response = await fetch("/api/ai/saldo", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ initData: user.initData }),
+  });
+  const data = (await response.json()) as {
+    ok?: boolean;
+    credits?: number;
+    registered?: boolean;
+    error?: string;
+  };
+  if (!response.ok || !data.ok) {
+    throw new Error(data.error === "auth" ? "Abra o Mini App pelo Telegram." : "Não foi possível ler o saldo.");
   }
+  return { credits: data.credits ?? 0, registered: Boolean(data.registered) };
 }
+
+export async function requestPick(text: string, image?: ImagePayload) {
+  const user = telegramUser();
+  const response = await fetch("/api/ai/predict", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      initData: user.initData,
+      text,
+      image,
+    }),
+  });
+  const data = (await response.json()) as {
+    ok?: boolean;
+    answer?: string;
+    credits?: number;
+    error?: string;
+  };
+  if (response.status === 402 || data.error === "no_credits") {
+    return { ok: false as const, error: "no_credits", credits: 0, answer: "" };
+  }
+  if (response.status === 401 || data.error === "auth") {
+    throw new Error("Abra o Mini App pelo Telegram para pedir palpite.");
+  }
+  if (!response.ok || !data.ok || !data.answer) {
+    throw new Error("A IA não respondeu. Tente de novo em instantes.");
+  }
+  return { ok: true as const, answer: data.answer, credits: data.credits ?? 0, error: "" };
+}
+
