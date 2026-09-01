@@ -1,14 +1,58 @@
 import { defineConfig, loadEnv, type PreviewServer, type ViteDevServer } from "vite";
 import react from "@vitejs/plugin-react";
 
-function postbackProxy(postbackBase: string, secret: string) {
+function proxyJson(
+  server: ViteDevServer | PreviewServer,
+  matchPath: string,
+  target: string,
+) {
+  server.middlewares.use(async (req, res, next) => {
+    const raw = req.url ?? "";
+    if (req.method !== "POST" || !raw.startsWith(matchPath)) {
+      next();
+      return;
+    }
+    if (!target) {
+      res.statusCode = 503;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify({ ok: false, error: "ai_not_configured" }));
+      return;
+    }
+
+    const chunks: Buffer[] = [];
+    for await (const chunk of req) chunks.push(Buffer.from(chunk));
+    const body = Buffer.concat(chunks).toString("utf8") || "{}";
+
+    try {
+      const remote = await fetch(target, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body,
+      });
+      const text = await remote.text();
+      res.statusCode = remote.status;
+      res.setHeader("Content-Type", remote.headers.get("content-type") || "application/json");
+      res.end(text || JSON.stringify({ ok: remote.ok }));
+    } catch {
+      res.statusCode = 502;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify({ ok: false, error: "ai_failed" }));
+    }
+  });
+}
+
+function backendProxy(postbackBase: string, secret: string, botApiBase: string) {
   return {
-    name: "postback-proxy",
+    name: "backend-proxy",
     configureServer(server: ViteDevServer) {
       attachPostback(server, postbackBase, secret);
+      proxyJson(server, "/api/ai/predict", `${botApiBase}/miniapp/predict`);
+      proxyJson(server, "/api/ai/saldo", `${botApiBase}/miniapp/saldo`);
     },
     configurePreviewServer(server: PreviewServer) {
       attachPostback(server, postbackBase, secret);
+      proxyJson(server, "/api/ai/predict", `${botApiBase}/miniapp/predict`);
+      proxyJson(server, "/api/ai/saldo", `${botApiBase}/miniapp/saldo`);
     },
   };
 }
@@ -54,12 +98,16 @@ function attachPostback(
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
+  const botApiBase = (
+    env.BOT_API_BASE || "https://placar-bot-production.up.railway.app"
+  ).replace(/\/$/, "");
   return {
     plugins: [
       react(),
-      postbackProxy(
-        env.POSTBACK_BASE || "https://ai-production-cad5.up.railway.app/postback",
+      backendProxy(
+        env.POSTBACK_BASE || "https://placar-bot-production.up.railway.app/postback",
         env.POSTBACK_SECRET || "",
+        botApiBase,
       ),
     ],
     server: {
@@ -68,3 +116,4 @@ export default defineConfig(({ mode }) => {
     },
   };
 });
+
