@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { loadGiftPick, type AiPick } from "./ai";
+import { loadSaldo, requestPick } from "./ai";
 import { buildLead, pickOfferUrl, submitLead } from "./api";
+import { fileToPayload } from "./image";
 import {
+  AI_PICKS_REGISTER,
   BONUS_LABEL,
   BOT_USERNAME,
   BRAND,
@@ -9,11 +11,12 @@ import {
   parseReferrer,
   PRIZES,
   PROMO_CODE,
+  STARTER_PREDICTION,
 } from "./prizes";
-import { haptic, openBot, openExternal, telegramUser } from "./telegram";
+import { haptic, openExternal, telegramUser } from "./telegram";
 import Wheel from "./Wheel";
 
-type Step = "gift" | "wheel" | "win" | "pending" | "invite";
+type Step = "gift" | "wheel" | "win" | "pending" | "invite" | "ask";
 type Flag = "gift" | "spin" | "registered" | "credits_done";
 
 function storageKey(kind: Flag | "referrer", telegramId: number | null) {
@@ -35,9 +38,7 @@ function rotationFor(extraTurns = 6) {
   return extraTurns * 360 + 360 - slice / 2;
 }
 
-function initialStep(
-  telegramId: number | null,
-): Step {
+function initialStep(telegramId: number | null): Step {
   if (localStorage.getItem(storageKey("credits_done", telegramId)) === "1") return "invite";
   if (localStorage.getItem(storageKey("registered", telegramId)) === "1") return "pending";
   if (localStorage.getItem(storageKey("spin", telegramId)) === "1") return "win";
@@ -51,6 +52,7 @@ export default function App() {
   const alreadySpun = localStorage.getItem(storageKey("spin", user.telegramId)) === "1";
 
   const [step, setStep] = useState<Step>(() => initialStep(user.telegramId));
+  const [askBack, setAskBack] = useState<Step>("gift");
   const [accepted, setAccepted] = useState(false);
   const [rotation, setRotation] = useState(0);
   const [spinning, setSpinning] = useState(false);
@@ -58,23 +60,39 @@ export default function App() {
   const [sending, setSending] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
-  const [giftPick, setGiftPick] = useState<AiPick | null>(null);
-  const [giftLoading, setGiftLoading] = useState(true);
+  const [matchText, setMatchText] = useState("");
+  const [photoName, setPhotoName] = useState("");
+  const [photoPreview, setPhotoPreview] = useState("");
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [answer, setAnswer] = useState("");
+  const [credits, setCredits] = useState<number | null>(null);
+  const [registered, setRegistered] = useState(false);
+  const [asking, setAsking] = useState(false);
 
   const shareUrl = user.telegramId ? inviteLink(user.telegramId) : "";
 
   useEffect(() => {
     let cancelled = false;
-    loadGiftPick().then((pick) => {
-      if (!cancelled) {
-        setGiftPick(pick);
-        setGiftLoading(false);
-      }
-    });
+    loadSaldo()
+      .then((value) => {
+        if (!cancelled) {
+          setCredits(value.credits);
+          setRegistered(value.registered);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setCredits(null);
+      });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [step]);
+
+  function openAsk() {
+    setError("");
+    setAskBack(step === "ask" ? askBack : step);
+    setStep("ask");
+  }
 
   function claimGift() {
     localStorage.setItem(storageKey("gift", user.telegramId), "1");
@@ -143,6 +161,51 @@ export default function App() {
     }
   }
 
+  function onPhoto(file: File | null) {
+    if (photoPreview) URL.revokeObjectURL(photoPreview);
+    if (!file) {
+      setPhotoFile(null);
+      setPhotoName("");
+      setPhotoPreview("");
+      return;
+    }
+    setPhotoFile(file);
+    setPhotoName(file.name);
+    setPhotoPreview(URL.createObjectURL(file));
+  }
+
+  async function ask() {
+    const text = matchText.trim();
+    if (!photoFile && text.length < 3) {
+      setError("Escreva o jogo ou envie um print.");
+      haptic("error");
+      return;
+    }
+    setError("");
+    setAsking(true);
+    try {
+      const image = photoFile ? await fileToPayload(photoFile) : undefined;
+      const result = await requestPick(text, image);
+      setCredits(result.credits);
+      if (!result.ok) {
+        haptic("error");
+        setError(
+          registered
+            ? "Saldo zerado. Indique um amigo para ganhar +10."
+            : `Saldo zerado. Cadastre-se com placar500 para ganhar +${AI_PICKS_REGISTER} palpites.`,
+        );
+        return;
+      }
+      setAnswer(result.answer);
+      haptic("win");
+    } catch (err) {
+      haptic("error");
+      setError(err instanceof Error ? err.message : "Falha ao pedir palpite.");
+    } finally {
+      setAsking(false);
+    }
+  }
+
   return (
     <main className="app">
       <header className="top">
@@ -160,30 +223,23 @@ export default function App() {
           <p className="kicker">Presente imediato</p>
           <h2>1 palpite de IA liberado</h2>
           <div className="prediction">
-            {giftLoading || !giftPick ? (
-              <p className="copy">Carregando palpite...</p>
-            ) : (
-              <>
-                <p className="kicker">{giftPick.league}</p>
-                <p className="match">{giftPick.match}</p>
-                <p className="pick">{giftPick.pick}</p>
-                <p className="copy">
-                  Confiança da IA: {giftPick.confidence}
-                  {giftPick.source === "demo" ? " · demo até a API voltar" : ""}
-                </p>
-              </>
-            )}
+            <p className="kicker">{STARTER_PREDICTION.league}</p>
+            <p className="match">{STARTER_PREDICTION.match}</p>
+            <p className="pick">{STARTER_PREDICTION.pick}</p>
+            <p className="copy">Confiança da IA: {STARTER_PREDICTION.confidence} · exemplo</p>
           </div>
           <p className="copy">
-            Os próximos palpites detalhados saem no bot @{BOT_USERNAME}. Agora gire a roleta — 1
-            vez.
+            Você tem <strong>1 palpite grátis</strong> agora: texto ou print. Os próximos{" "}
+            <strong>{AI_PICKS_REGISTER} palpites</strong> entram só depois do cadastro confirmado.
           </p>
           <button className="cta" type="button" onClick={claimGift}>
-            <span className="wheel-icon" aria-hidden="true">🎡</span>
+            <span className="wheel-icon" aria-hidden="true">
+              🎡
+            </span>
             Girar a roleta
           </button>
-          <button className="cta secondary" type="button" onClick={() => openBot()}>
-            Pedir palpite no bot
+          <button className="cta secondary" type="button" onClick={openAsk}>
+            Pedir palpite agora
           </button>
         </section>
       )}
@@ -214,6 +270,9 @@ export default function App() {
               </>
             )}
           </button>
+          <button className="cta secondary" type="button" onClick={openAsk}>
+            Pedir palpite
+          </button>
         </section>
       )}
 
@@ -225,12 +284,16 @@ export default function App() {
             Promocode <strong>{PROMO_CODE}</strong>
           </p>
           <p className="copy">
-            Para usar o bônus de 500%, cadastre-se e aplique o promocode. Depois que o registro for
-            confirmado, você recebe <strong>20 palpites de IA</strong> no bot.
+            Para usar o bônus de 500%, cadastre-se e aplique o promocode. Antes disso você tem{" "}
+            <strong>1 palpite grátis</strong>. Depois do registro confirmado entram mais{" "}
+            <strong>{AI_PICKS_REGISTER} palpites de IA</strong>. Texto ou print, como preferir.
           </p>
           {error ? <p className="error">{error}</p> : null}
           <button className="cta" type="button" disabled={sending} onClick={register}>
             {sending ? "Abrindo..." : "Cadastrar e usar o bônus"}
+          </button>
+          <button className="cta secondary" type="button" onClick={openAsk}>
+            Pedir palpite
           </button>
         </section>
       )}
@@ -243,11 +306,63 @@ export default function App() {
             Promocode <strong>{PROMO_CODE}</strong>
           </p>
           <p className="copy">
-            Cadastre-se para usar o bônus. Os 20 palpites de IA entram após o registro confirmado.
+            Cadastre-se para usar o bônus. Os {AI_PICKS_REGISTER} palpites extra entram só após o
+            registro confirmado. Agora você pode usar o palpite grátis: texto ou print.
           </p>
           {error ? <p className="error">{error}</p> : null}
           <button className="cta" type="button" disabled={sending} onClick={register}>
             {sending ? "Abrindo..." : "Cadastrar e usar o bônus"}
+          </button>
+          <button className="cta secondary" type="button" onClick={openAsk}>
+            Pedir palpite
+          </button>
+        </section>
+      )}
+
+      {step === "ask" && (
+        <section className="card">
+          <p className="kicker">Palpite da IA</p>
+          <h2>Texto ou print</h2>
+          <p className="copy">
+            1 palpite grátis antes do cadastro. Depois, +{AI_PICKS_REGISTER}. Cada pedido desconta 1.
+          </p>
+          <label className="field">
+            Escreva o jogo
+            <textarea
+              rows={3}
+              value={matchText}
+              onChange={(event) => setMatchText(event.target.value)}
+              placeholder="Palmeiras x Flamengo"
+            />
+          </label>
+          <label className="file-btn">
+            {photoName || "Ou escolher print do jogo"}
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(event) => onPhoto(event.target.files?.[0] ?? null)}
+            />
+          </label>
+          {photoPreview ? <img className="photo-preview" src={photoPreview} alt="Print do jogo" /> : null}
+          {error ? <p className="error">{error}</p> : null}
+          {answer ? <p className="prediction pick-answer">{answer}</p> : null}
+          <button className="cta" type="button" disabled={asking} onClick={() => void ask()}>
+            {asking ? "Analisando..." : "Pedir palpite"}
+          </button>
+          {credits === 0 ? (
+            <button className="cta secondary" type="button" disabled={sending} onClick={register}>
+              Cadastrar e usar o bônus
+            </button>
+          ) : null}
+          <button
+            className="cta secondary"
+            type="button"
+            onClick={() => {
+              setError("");
+              setStep(askBack);
+            }}
+          >
+            Voltar
           </button>
         </section>
       )}
@@ -257,13 +372,9 @@ export default function App() {
           <p className="kicker">Palpites acabaram</p>
           <h2>+10 de IA por amigo</h2>
           <p className="copy">
-            Seus 20 palpites de IA terminaram. Envie este link ao amigo. Os{" "}
+            Seus palpites de IA terminaram. Envie este link ao amigo. Os{" "}
             <strong>10 palpites de IA</strong> entram só depois que ele abrir o link, se cadastrar
             com o promocode <strong>{PROMO_CODE}</strong> e o registro for confirmado.
-          </p>
-          <p className="copy">
-            Só o link não conta: o amigo precisa concluir o cadastro. A confirmação vem pelo
-            Telegram dele + o postback da casa.
           </p>
           {shareUrl ? (
             <>
@@ -275,11 +386,25 @@ export default function App() {
           ) : (
             <p className="error">Abra no Telegram para gerar seu link de indicação.</p>
           )}
+          <button className="cta secondary" type="button" disabled={sending} onClick={register}>
+            Cadastrar e usar o bônus
+          </button>
         </section>
       )}
 
       <p className="legal">18+. Jogue com responsabilidade. Promoções sujeitas a regras do operador.</p>
+
+      <div className="saldo-bar">
+        <p>
+          💎 Saldo:{" "}
+          <strong>{credits === null ? "—" : credits}</strong> palpite(s)
+        </p>
+        {step !== "ask" ? (
+          <button type="button" onClick={openAsk}>
+            Pedir palpite
+          </button>
+        ) : null}
+      </div>
     </main>
   );
 }
-
