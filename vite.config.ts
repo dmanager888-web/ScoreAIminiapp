@@ -71,6 +71,7 @@ function attachPostback(
 
     const incoming = new URL(raw, "http://127.0.0.1");
     const sub1 = incoming.searchParams.get("sub1") ?? "";
+    const sub2 = incoming.searchParams.get("sub2") ?? "";
     if (!sub1 || !secret || !postbackBase) {
       res.statusCode = 400;
       res.setHeader("Content-Type", "application/json");
@@ -80,6 +81,7 @@ function attachPostback(
 
     const target = new URL(postbackBase);
     target.searchParams.set("sub1", sub1);
+    if (sub2) target.searchParams.set("sub2", sub2);
     target.searchParams.set("secret", secret);
 
     try {
