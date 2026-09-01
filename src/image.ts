@@ -33,3 +33,4 @@ export async function fileToPayload(file: File): Promise<ImagePayload> {
   }
   return { base64, mime: "image/jpeg" };
 }
+
