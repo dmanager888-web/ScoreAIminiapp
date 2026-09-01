@@ -68,23 +68,41 @@ export default function App() {
   const [credits, setCredits] = useState<number | null>(null);
   const [registered, setRegistered] = useState(false);
   const [asking, setAsking] = useState(false);
+  const [checking, setChecking] = useState(false);
 
   const shareUrl = user.telegramId ? inviteLink(user.telegramId) : "";
 
   useEffect(() => {
     let cancelled = false;
-    loadSaldo()
-      .then((value) => {
-        if (!cancelled) {
-          setCredits(value.credits);
-          setRegistered(value.registered);
+
+    async function pull() {
+      try {
+        const value = await loadSaldo();
+        if (cancelled) return;
+        setCredits(value.credits);
+        setRegistered(value.registered);
+        if (value.registered && value.credits > 0 && step === "pending") {
+          haptic("win");
+          setAskBack("pending");
+          setStep("ask");
         }
-      })
-      .catch(() => {
+      } catch {
         if (!cancelled) setCredits(null);
-      });
+      }
+    }
+
+    void pull();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void pull();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    const timer = step === "pending" ? window.setInterval(() => void pull(), 4000) : 0;
     return () => {
       cancelled = true;
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+      if (timer) window.clearInterval(timer);
     };
   }, [step]);
 
@@ -149,6 +167,33 @@ export default function App() {
     }
   }
 
+  async function checkRegistration() {
+    setChecking(true);
+    setError("");
+    try {
+      const value = await loadSaldo();
+      setCredits(value.credits);
+      setRegistered(value.registered);
+      if (value.registered && value.credits > 0) {
+        haptic("win");
+        setAskBack("pending");
+        setStep("ask");
+        return;
+      }
+      if (value.credits > 0) {
+        setError("O cadastro ainda não foi confirmado. Você ainda pode usar o palpite grátis.");
+        return;
+      }
+      setError(
+        "Ainda não chegou a confirmação. Termine o cadastro com o promocode e volte em 1 minuto.",
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível checar o saldo.");
+    } finally {
+      setChecking(false);
+    }
+  }
+
   async function copyInvite() {
     if (!shareUrl) return;
     try {
@@ -187,12 +232,15 @@ export default function App() {
       const image = photoFile ? await fileToPayload(photoFile) : undefined;
       const result = await requestPick(text, image);
       setCredits(result.credits);
+      if ("registered" in result && result.registered) {
+        setRegistered(true);
+      }
       if (!result.ok) {
         haptic("error");
         setError(
-          registered
+          result.registered || registered
             ? "Saldo zerado. Indique um amigo para ganhar +10."
-            : `Saldo zerado. Cadastre-se com placar500 para ganhar +${AI_PICKS_REGISTER} palpites.`,
+            : `Cadastro ainda não confirmado. Use o promocode ${PROMO_CODE} e aguarde a liberação dos ${AI_PICKS_REGISTER} palpites.`,
         );
         return;
       }
@@ -306,12 +354,16 @@ export default function App() {
             Promocode <strong>{PROMO_CODE}</strong>
           </p>
           <p className="copy">
-            Cadastre-se para usar o bônus. Os {AI_PICKS_REGISTER} palpites extra entram só após o
-            registro confirmado. Agora você pode usar o palpite grátis: texto ou print.
+            O clique no cadastro ainda não libera a IA. Os {AI_PICKS_REGISTER} palpites entram
+            quando a 1win confirmar o registro com o promocode <strong>{PROMO_CODE}</strong>.
+            Depois disso o saldo embaixo sobe e o palpite abre aqui.
           </p>
           {error ? <p className="error">{error}</p> : null}
           <button className="cta" type="button" disabled={sending} onClick={register}>
             {sending ? "Abrindo..." : "Cadastrar e usar o bônus"}
+          </button>
+          <button className="cta secondary" type="button" disabled={checking} onClick={() => void checkRegistration()}>
+            {checking ? "Checando..." : "Já me cadastrei"}
           </button>
           <button className="cta secondary" type="button" onClick={openAsk}>
             Pedir palpite
@@ -324,7 +376,9 @@ export default function App() {
           <p className="kicker">Palpite da IA</p>
           <h2>Texto ou print</h2>
           <p className="copy">
-            1 palpite grátis antes do cadastro. Depois, +{AI_PICKS_REGISTER}. Cada pedido desconta 1.
+            {registered
+              ? `Saldo após cadastro: peça o palpite por texto ou print. Cada pedido desconta 1.`
+              : `1 palpite grátis antes do cadastro. Depois, +${AI_PICKS_REGISTER}. Cada pedido desconta 1.`}
           </p>
           <label className="field">
             Escreva o jogo
@@ -408,3 +462,4 @@ export default function App() {
     </main>
   );
 }
+
