@@ -7,8 +7,11 @@ const PORT = Number(process.env.PORT || 3000);
 const ROOT = fileURLToPath(new URL(".", import.meta.url));
 const DIST = resolve(ROOT, "dist");
 const POSTBACK_BASE =
-  process.env.POSTBACK_BASE || "https://ai-production-cad5.up.railway.app/postback";
+  process.env.POSTBACK_BASE || "https://placar-bot-production.up.railway.app/postback";
 const POSTBACK_SECRET = process.env.POSTBACK_SECRET || "";
+const BOT_API_BASE = (
+  process.env.BOT_API_BASE || "https://placar-bot-production.up.railway.app"
+).replace(/\/$/, "");
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -33,6 +36,29 @@ function safeFile(urlPath) {
   if (existsSync(file) && statSync(file).isFile()) return file;
   const index = join(DIST, "index.html");
   return existsSync(index) ? index : null;
+}
+
+async function proxyJson(req, res, target) {
+  const chunks = [];
+  for await (const chunk of req) chunks.push(chunk);
+  const body = Buffer.concat(chunks).toString("utf8") || "{}";
+
+  try {
+    const remote = await fetch(target, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+    });
+    const text = await remote.text();
+    send(
+      res,
+      remote.status,
+      text || JSON.stringify({ ok: remote.ok }),
+      remote.headers.get("content-type") || "application/json; charset=utf-8",
+    );
+  } catch {
+    send(res, 502, JSON.stringify({ ok: false, error: "ai_failed" }));
+  }
 }
 
 async function handlePostback(req, res) {
@@ -65,6 +91,14 @@ createServer(async (req, res) => {
   const path = req.url || "/";
   if (path.startsWith("/api/postback")) {
     await handlePostback(req, res);
+    return;
+  }
+  if (req.method === "POST" && path.startsWith("/api/ai/predict")) {
+    await proxyJson(req, res, `${BOT_API_BASE}/miniapp/predict`);
+    return;
+  }
+  if (req.method === "POST" && path.startsWith("/api/ai/saldo")) {
+    await proxyJson(req, res, `${BOT_API_BASE}/miniapp/saldo`);
     return;
   }
 
