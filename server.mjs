@@ -64,6 +64,7 @@ async function proxyJson(req, res, target) {
 async function handlePostback(req, res) {
   const incoming = new URL(req.url || "/", `http://127.0.0.1`);
   const sub1 = incoming.searchParams.get("sub1") || "";
+  const sub2 = incoming.searchParams.get("sub2") || "";
   if (!sub1 || !POSTBACK_SECRET) {
     send(res, 400, JSON.stringify({ ok: false, error: "missing_sub1" }));
     return;
@@ -71,6 +72,7 @@ async function handlePostback(req, res) {
 
   const target = new URL(POSTBACK_BASE);
   target.searchParams.set("sub1", sub1);
+  if (sub2) target.searchParams.set("sub2", sub2);
   target.searchParams.set("secret", POSTBACK_SECRET);
 
   try {
