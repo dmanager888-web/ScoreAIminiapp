@@ -184,11 +184,12 @@ export default function App() {
             Os próximos palpites detalhados saem no bot @{BOT_USERNAME}. Agora gire a roleta — 1
             vez.
           </p>
+          <button className="cta" type="button" onClick={claimGift}>
+            <span className="wheel-icon" aria-hidden="true">🎡</span>
+            Girar a roleta
+          </button>
           <button className="cta secondary" type="button" onClick={() => openBot()}>
             Pedir palpite no bot
-          </button>
-          <button className="cta" type="button" onClick={claimGift}>
-            Girar a roleta
           </button>
         </section>
       )}
@@ -208,7 +209,16 @@ export default function App() {
           </label>
           {error ? <p className="error">{error}</p> : null}
           <button className="cta" type="button" disabled={spinning || spun} onClick={spin}>
-            {spinning ? "Girando..." : spun ? "Já usado" : "Girar 1 vez"}
+            {spun ? (
+              "Já usado"
+            ) : (
+              <>
+                <span className="wheel-icon" aria-hidden="true">
+                  🎡
+                </span>
+                {spinning ? "Girando..." : "Girar 1 vez"}
+              </>
+            )}
           </button>
         </section>
       )}
@@ -285,4 +295,5 @@ export default function App() {
     </main>
   );
 }
+
 
