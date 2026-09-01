@@ -32,7 +32,7 @@ body {
 .app {
   max-width: 430px;
   margin: 0 auto;
-  padding: calc(var(--safe-top) + 16px) 18px calc(var(--safe-bottom) + 20px);
+  padding: calc(var(--safe-top) + 16px) 18px calc(var(--safe-bottom) + 88px);
 }
 
 .top h1,
@@ -89,7 +89,8 @@ body {
 }
 
 input[type="email"],
-input:not([type="checkbox"]) {
+input:not([type="checkbox"]),
+textarea {
   width: 100%;
   border: 1px solid #3a6a4c;
   background: #0b1c13;
@@ -97,6 +98,15 @@ input:not([type="checkbox"]) {
   border-radius: 14px;
   padding: 14px 12px;
   font: inherit;
+  resize: vertical;
+}
+
+.pick-answer {
+  white-space: pre-wrap;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.45;
 }
 
 .cta {
@@ -253,5 +263,64 @@ input:not([type="checkbox"]) {
   border-top: 22px solid #fff4c2;
   transform: translateX(-50%);
   filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.4));
+}
+
+.file-btn {
+  display: block;
+  margin: 14px 0 10px;
+  padding: 14px 12px;
+  border-radius: 14px;
+  border: 1px dashed #3a6a4c;
+  background: #0b1c13;
+  text-align: center;
+  font-weight: 800;
+  color: var(--gold);
+  cursor: pointer;
+}
+
+.file-btn input {
+  display: none;
+}
+
+.photo-preview {
+  display: block;
+  width: 100%;
+  max-height: 180px;
+  object-fit: cover;
+  border-radius: 14px;
+  margin-bottom: 12px;
+  border: 1px solid #2e5a3f;
+}
+
+.saldo-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  max-width: 430px;
+  margin: 0 auto;
+  padding: 12px 18px calc(var(--safe-bottom) + 10px);
+  background: #0b1c13;
+  border-top: 1px solid #2e5a3f;
+}
+
+.saldo-bar p {
+  margin: 0;
+  font-weight: 700;
+}
+
+.saldo-bar button {
+  border: 0;
+  border-radius: 12px;
+  padding: 8px 12px;
+  background: linear-gradient(180deg, #ffd76a, #d4a017);
+  color: #1a1403;
+  font: 800 13px Nunito, sans-serif;
+  white-space: nowrap;
 }
 
