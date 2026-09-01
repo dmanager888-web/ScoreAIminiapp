@@ -3,6 +3,7 @@ export const BRAND = "Placar.AI";
 export const BOT_USERNAME = "PlacarAI_bot";
 export const PROMO_CODE = "placar500";
 export const BONUS_LABEL = "500%";
+export const AI_PICKS_REGISTER = 10;
 
 export const PRIZES = Array.from({ length: 8 }, (_, index) => ({
   id: `bonus-500-${index}`,
