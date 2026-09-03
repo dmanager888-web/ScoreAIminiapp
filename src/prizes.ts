@@ -11,10 +11,12 @@ export const PRIZES = Array.from({ length: 8 }, (_, index) => ({
   color: index % 2 === 0 ? "#1f8a4c" : "#d4af37",
 }));
 
+export const MATCH_EXAMPLE = "Real Madrid vs Manchester City";
+
 export const STARTER_PREDICTION = {
-  league: "Brasileirão",
-  match: "Palmeiras vs Flamengo",
-  pick: "Mais de 1.5 gols",
+  league: "UEFA Champions League",
+  match: MATCH_EXAMPLE,
+  pick: "Over 2.5 goals",
   confidence: "78%",
 };
 
@@ -26,3 +28,4 @@ export function parseReferrer(startParam: string) {
   const match = startParam.trim().match(/^ref[_-]?(\d+)$/i);
   return match ? match[1] : "";
 }
+
