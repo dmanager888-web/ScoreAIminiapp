@@ -9,6 +9,7 @@ import {
   BOT_USERNAME,
   BRAND,
   inviteLink,
+  MATCH_EXAMPLE,
   parseReferrer,
   PRIZES,
   PROMO_CODE,
@@ -407,7 +408,7 @@ export default function App() {
               rows={3}
               value={matchText}
               onChange={(event) => setMatchText(event.target.value)}
-              placeholder="Palmeiras x Flamengo"
+              placeholder={MATCH_EXAMPLE}
             />
           </label>
           <label className="file-btn">
@@ -478,3 +479,4 @@ export default function App() {
     </main>
   );
 }
+
